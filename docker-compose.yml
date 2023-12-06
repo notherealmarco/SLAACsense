@@ -1,0 +1,16 @@
+version: '3.6'
+services:
+  slaacsense:
+    build: .
+    container_name: slaacsense
+    restart: unless-stopped
+    environment:
+      - OPNSENSE_URL=${OPNSENSE_URL}
+      - OPNSENSE_API_KEY=${OPNSENSE_API_KEY}
+      - OPNSENSE_API_SECRET=${OPNSENSE_API_SECRET}
+      - TECHNITIUM_URL=${TECHNITIUM_URL}
+      - TECHNITIUM_TOKEN=${TECHNITIUM_TOKEN}
+      - DNS_ZONE_SUBNETS=${DNS_ZONE_SUBNETS}
+      - DO_V4=${DO_V4}
+      - VERIFY_HTTPS=${VERIFY_HTTPS}
+      - CLOCK=${CLOCK}
