@@ -5,16 +5,15 @@ import requests
 import ipaddress
 import urllib3
 
-OPNSENSE_URL = ""
-OPNSENSE_API_KEY = ""
-OPNSENSE_API_SECRET = ""
-TECHNITIUM_URL = ""
-TECHNITIUM_TOKEN = ""
-IPV6_PREFIX = ""
-DNS_ZONE_SUBNETS = ""
-DO_V4 = False
-VERIFY_HTTPS = False
-CLOCK = 30
+OPNSENSE_URL = os.getenv("OPNSENSE_URL", None)
+OPNSENSE_API_KEY = os.getenv("OPNSENSE_API_KEY", None)
+OPNSENSE_API_SECRET = os.getenv("OPNSENSE_API_SECRET", None)
+TECHNITIUM_URL = os.getenv("TECHNITIUM_URL", None)
+TECHNITIUM_TOKEN = os.getenv("TECHNITIUM_TOKEN", None)
+DNS_ZONE_SUBNETS = os.getenv("DNS_ZONE_SUBNETS", None)
+DO_V4 = (os.getenv("DO_V4", "false").lower() == "true")
+VERIFY_HTTPS = (os.getenv("VERIFY_HTTPS", "true").lower() == "true")
+CLOCK = int(os.getenv("CLOCK", "30"))
 
 
 def get_opnsense_data(path):
@@ -120,16 +119,6 @@ def verify_env() -> bool:
 if __name__ == "__main__":
     logging.getLogger().setLevel(os.getenv("LOG_LEVEL", "INFO"))
     logging.info("loading environment...")
-
-    OPNSENSE_URL = os.getenv("OPNSENSE_URL", None)
-    OPNSENSE_API_KEY = os.getenv("OPNSENSE_API_KEY", None)
-    OPNSENSE_API_SECRET = os.getenv("OPNSENSE_API_SECRET", None)
-    TECHNITIUM_URL = os.getenv("TECHNITIUM_URL", None)
-    TECHNITIUM_TOKEN = os.getenv("TECHNITIUM_TOKEN", None)
-    DNS_ZONE_SUBNETS = os.getenv("DNS_ZONE_SUBNETS", None)
-    DO_V4 = (os.getenv("DO_V4", "false").lower() == "true")
-    VERIFY_HTTPS = (os.getenv("VERIFY_HTTPS", "true").lower() == "true")
-    CLOCK = int(os.getenv("CLOCK", "30"))
 
     if not verify_env():
         logging.error("Missing mandatory environment variables")
