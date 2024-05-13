@@ -36,7 +36,7 @@ def build_matches(ndp, leases):
     matches = set()
     for e in leases["rows"]:
         ip6s = tuple(x["ip"].split("%")[0] for x in ndp["rows"] if x["mac"] == e["mac"])
-        if len(ip6s) == 0:
+        if len(ip6s) == 0 and not DO_V4:
             continue
         matches.add((e["address"], ip6s, e["hostname"]))
     return matches
