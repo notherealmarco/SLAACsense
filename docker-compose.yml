@@ -1,9 +1,11 @@
 version: '3.6'
 services:
   slaacsense:
+    image: ghcr.io/notherealmarco/slaacsense:latest
     build: .
     container_name: slaacsense
     restart: unless-stopped
+    pull_policy: always
     environment:
       - OPNSENSE_URL=${OPNSENSE_URL}
       - OPNSENSE_API_KEY=${OPNSENSE_API_KEY}
