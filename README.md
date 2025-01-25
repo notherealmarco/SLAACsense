@@ -10,9 +10,6 @@ By leveraging the DHCPv4 lease information and mapping it to the MAC address, th
 
 Define the environment variables in the docker-compose file, then run: `docker compose up -d`
 
-#### Disclaimer:
-If DNS records are not being added, make sure that the corresponding reverse zone exists in Technitium DNS, otherwise the script will fail silently.
-
 ### Environment variables:
 
 | Variable Name         | Description                                                                              | Example Value                                                          |
@@ -30,6 +27,7 @@ If DNS records are not being added, make sure that the corresponding reverse zon
 
 ### Note
 You have to create the corresponding DNS zones in the Technitium dashboard, you can configure them as primary or conditional forwarder zones.
+If DNS records are not being added, make sure that the corresponding reverse zone exists in Technitium DNS, otherwise the script will fail silently.
 
 ### Contributing:
 I welcome contributions! Feel free to submit issues, feature requests, or pull requests.
