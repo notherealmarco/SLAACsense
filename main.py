@@ -32,7 +32,7 @@ def get_dhcp4_leases():
 def build_matches(ndp, leases):
     matches = set()
     for e in leases["rows"]:
-        ip6s = tuple(x["ip"].split("%")[0] for x in ndp["rows"] if x["mac"] == e["mac"] and e["if_descr"] == x["intf_description"])
+        ip6s = tuple(x["ip"].split("%")[0] for x in ndp["rows"] if x["mac"] == e["mac"])
         if len(ip6s) == 0 and not DO_V4:
             continue
         matches.add((e["address"], ip6s, e["hostname"]))
@@ -74,7 +74,7 @@ def sync_records(zones, match):
         return
 
     ip4 = match[0]
-    ip6s = [ipaddress.ip_address(x) for x in match[1]]
+    ip6s = [ipaddress.ip_address(x).compressed for x in match[1]]
     hostname = match[2]
 
     if hostname == "":
@@ -82,8 +82,8 @@ def sync_records(zones, match):
         return
 
     existing_records = get_existing_records(hostname, zone)
-    existing_ips = {r["rData"]["ipAddress"] for r in existing_records if r["type"] in ["A", "AAAA"]}
-    current_ips = set([ip4] if DO_V4 else []) | {ip.exploded for ip in ip6s}
+    existing_ips = {ipaddress.ip_address(r["rData"]["ipAddress"]).compressed for r in existing_records if r["type"] in ["A", "AAAA"]}
+    current_ips = set([ipaddress.ip_address(ip4).compressed] if DO_V4 else []) | set(ip6s)
 
     # Delete outdated records
     for ip in existing_ips - current_ips:
