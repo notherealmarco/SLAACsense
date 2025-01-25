@@ -10,19 +10,23 @@ By leveraging the DHCPv4 lease information and mapping it to the MAC address, th
 
 Define the environment variables in the docker-compose file, then run: `docker compose up -d`
 
+#### Disclaimer:
+If DNS records are not being added, make sure that the corresponding reverse zone exists in Technitium DNS, otherwise the script will fail silently.
+
 ### Environment variables:
 
-| Variable Name         | Description                                                                              | Example Value                                                         |
-|-----------------------|------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
-| `OPNSENSE_URL`        | The base URL of your OPNsense instance                                                   | http://192.168.1.1 (required)                                         
-| `OPNSENSE_API_KEY`    | OPNsense API key                                                                         | `your_opnsense_api_key` (required)                                    |
-| `OPNSENSE_API_SECRET` | OPNsense API secret                                                                      | `a_very_secret_token` (required)                                      |
-| `TECHNITIUM_URL`      | The base URL of your Technitium DNS instance                                             | `dns.myawesomehome.home.arpa` (required)                              |
-| `TECHNITIUM_TOKEN`    | Technitium DNS token                                                                     | `another_very_secret_token` (required)                                |
+| Variable Name         | Description                                                                              | Example Value                                                          |
+|-----------------------|------------------------------------------------------------------------------------------|------------------------------------------------------------------------|
+| `OPNSENSE_URL`        | The base URL of your OPNsense instance                                                   | http://192.168.1.1 (required)                                          
+| `OPNSENSE_API_KEY`    | OPNsense API key                                                                         | `your_opnsense_api_key` (required)                                     |
+| `OPNSENSE_API_SECRET` | OPNsense API secret                                                                      | `a_very_secret_token` (required)                                       |
+| `TECHNITIUM_URL`      | The base URL of your Technitium DNS instance                                             | `dns.myawesomehome.home.arpa` (required)                               |
+| `TECHNITIUM_TOKEN`    | Technitium DNS token                                                                     | `another_very_secret_token` (required)                                 |
 | `DNS_ZONE_SUBNETS`    | Comma separated DNS zones and IPv4 subnet                                                | `192.168.1.0/24=lan.home.arpa,192.168.2.0/24=dmz.home.arpa` (required) |
-| `DO_V4`               | If set to true, A records will be configured, otherwise only AAAA records are configured | `false` (defaults to false)                                           |
-| `VERIFY_HTTPS`        | Verify OPNsense and Technitium's SSL certificates                                        | `true` (defaults to true)                                             |
-| `CLOCK`               | Interval between updates (in seconds)                                                    | `30` (defaults to 30)                                                 |
+| `DO_V4`               | If set to true, A records will be configured, otherwise only AAAA records are configured | `false` (defaults to false)                                            |
+| `IGNORE_LINK_LOCAL`   | If set to true, link local IPv6 addresses wil be ignored                                 | `true` (defaults to true)                                              |
+| `VERIFY_HTTPS`        | Verify OPNsense and Technitium's SSL certificates                                        | `true` (defaults to true)                                              |
+| `CLOCK`               | Interval between updates (in seconds)                                                    | `30` (defaults to 30)                                                  |
 
 ### Note
 You have to create the corresponding DNS zones in the Technitium dashboard, you can configure them as primary or conditional forwarder zones.
