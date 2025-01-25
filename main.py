@@ -13,6 +13,7 @@ TECHNITIUM_URL = os.getenv("TECHNITIUM_URL", None)
 TECHNITIUM_TOKEN = os.getenv("TECHNITIUM_TOKEN", None)
 DNS_ZONE_SUBNETS = os.getenv("DNS_ZONE_SUBNETS", None)
 DO_V4 = (os.getenv("DO_V4", "false").lower() == "true")
+IGNORE_LINK_LOCAL = (os.getenv("IGNORE_LINK_LOCAL", "true").lower() == "true")
 VERIFY_HTTPS = (os.getenv("VERIFY_HTTPS", "true").lower() == "true")
 CLOCK = int(os.getenv("CLOCK", "30"))
 
@@ -33,6 +34,8 @@ def build_matches(ndp, leases):
     matches = set()
     for e in leases["rows"]:
         ip6s = tuple(x["ip"].split("%")[0] for x in ndp["rows"] if x["mac"] == e["mac"])
+        if IGNORE_LINK_LOCAL:
+            ip6s = tuple(ip for ip in ip6s if not ipaddress.ip_address(ip).is_link_local)
         if len(ip6s) == 0 and not DO_V4:
             continue
         matches.add((e["address"], ip6s, e["hostname"]))
