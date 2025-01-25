@@ -4,6 +4,7 @@ import time
 import requests
 import ipaddress
 import urllib3
+from collections import defaultdict
 
 # Environment variables
 OPNSENSE_URL = os.getenv("OPNSENSE_URL", None)
@@ -32,14 +33,34 @@ def get_dhcp4_leases():
 
 def build_matches(ndp, leases):
     matches = set()
+    hostname_to_macs = defaultdict(lambda: defaultdict(list))
+
     for e in leases["rows"]:
-        ip6s = tuple(x["ip"].split("%")[0] for x in ndp["rows"] if x["mac"] == e["mac"])
+        ip6s = tuple(
+            x["ip"].split("%")[0] for x in ndp["rows"]
+            if x["mac"] == e["mac"] and x["intf_description"] == e["if_descr"]
+        )
         if IGNORE_LINK_LOCAL:
             ip6s = tuple(ip for ip in ip6s if not ipaddress.ip_address(ip).is_link_local)
         if len(ip6s) == 0 and not DO_V4:
             continue
-        matches.add((e["address"], ip6s, e["hostname"]))
-    return matches
+
+        hostname = e["hostname"]
+        if hostname:
+            hostname_to_macs[hostname][e["if_descr"]].append(e["mac"])
+
+        matches.add((e["address"], ip6s, hostname, e["if_descr"], e["mac"]))
+
+    # Handle duplicate hostnames on the same interface
+    adjusted_matches = set()
+    for match in matches:
+        ip4, ip6s, hostname, if_descr, mac = match
+        if hostname and len(hostname_to_macs[hostname][if_descr]) > 1:
+            # Add the last 4 characters of the MAC address to the hostname
+            hostname = f"{hostname}-{mac.replace(':', '')[-4:]}"
+        adjusted_matches.add((ip4, ip6s, hostname))
+
+    return adjusted_matches
 
 def find_zone(zones, ip4):
     for zone in zones:
