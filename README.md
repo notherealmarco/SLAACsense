@@ -24,6 +24,7 @@ Define the environment variables in the docker-compose file, then run: `docker c
 | `IGNORE_LINK_LOCAL`   | If set to true, link local IPv6 addresses wil be ignored                                 | `true` (defaults to true)                                              |
 | `VERIFY_HTTPS`        | Verify OPNsense and Technitium's SSL certificates                                        | `true` (defaults to true)                                              |
 | `CLOCK`               | Interval between updates (in seconds)                                                    | `30` (defaults to 30)                                                  |
+| `REFRESH_CYCLE`       | How often to refresh all DNS records (in cycles)                                         | `120` (defaults to 120, ~1 hour with default CLOCK)                    |
 
 ### Note
 You have to create the corresponding DNS zones in the Technitium dashboard, you can configure them as primary or conditional forwarder zones.

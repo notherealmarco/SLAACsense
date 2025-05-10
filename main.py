@@ -17,6 +17,8 @@ DO_V4 = (os.getenv("DO_V4", "false").lower() == "true")
 IGNORE_LINK_LOCAL = (os.getenv("IGNORE_LINK_LOCAL", "true").lower() == "true")
 VERIFY_HTTPS = (os.getenv("VERIFY_HTTPS", "true").lower() == "true")
 CLOCK = int(os.getenv("CLOCK", "30"))
+# How often to refresh all records (in cycles)
+REFRESH_CYCLE = int(os.getenv("REFRESH_CYCLE", "1440"))
 
 def get_opnsense_data(path):
     r = requests.get(url=OPNSENSE_URL + path, verify=VERIFY_HTTPS, auth=(OPNSENSE_API_KEY, OPNSENSE_API_SECRET))
@@ -129,21 +131,35 @@ def run():
         zone = z.split("=")
         zones.append((ipaddress.ip_network(zone[0]), zone[1]))
 
+    refresh_counter = 0
+    
     while True:
         ndp = get_ndp()
         if ndp is None:
             logging.error("Error retrieving NDP table")
+            time.sleep(CLOCK)
             continue
         leases = get_dhcp4_leases()
         if leases is None:
             logging.error("Error retrieving DHCPv4 leases")
+            time.sleep(CLOCK)
             continue
         matches = build_matches(ndp, leases)
+        
+        # Process new matches (hosts that appeared or changed)
         new_matches = matches - previous_matches
-        previous_matches = matches
-
         for match in new_matches:
             sync_records(zones, match)
+            
+        # Every REFRESH_CYCLE iterations, refresh all records to prevent expiration
+        refresh_counter += 1
+        if refresh_counter >= REFRESH_CYCLE:
+            logging.info(f"Performing periodic refresh of all DNS records")
+            for match in matches:
+                sync_records(zones, match)
+            refresh_counter = 0
+        
+        previous_matches = matches
         time.sleep(CLOCK)
 
 def verify_env() -> bool:
