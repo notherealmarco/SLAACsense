@@ -33,6 +33,9 @@ def get_ndp():
 def get_dhcp4_leases():
     return get_opnsense_data("/api/dhcpv4/leases/searchLease")
 
+def get_dhcp4_leases_v2():
+    return get_opnsense_data("/api/dnsmasq/leases/search")
+
 def build_matches(ndp, leases):
     matches = set()
     hostname_to_macs = defaultdict(lambda: defaultdict(list))
@@ -40,7 +43,7 @@ def build_matches(ndp, leases):
     for e in leases["rows"]:
         ip6s = tuple(
             x["ip"].split("%")[0] for x in ndp["rows"]
-            if x["mac"] == e["mac"] and x["intf_description"] == e["if_descr"]
+            if x["mac"] == e["hwaddr"] and x["intf_description"] == e["if_descr"]
         )
         if IGNORE_LINK_LOCAL:
             ip6s = tuple(ip for ip in ip6s if not ipaddress.ip_address(ip).is_link_local)
@@ -48,10 +51,11 @@ def build_matches(ndp, leases):
             continue
 
         hostname = e["hostname"]
+        if hostname == "*": hostname = ""
         if hostname:
-            hostname_to_macs[hostname][e["if_descr"]].append(e["mac"])
+            hostname_to_macs[hostname][e["if_descr"]].append(e["hwaddr"])
 
-        matches.add((e["address"], ip6s, hostname, e["if_descr"], e["mac"]))
+        matches.add((e["address"], ip6s, hostname, e["if_descr"], e["hwaddr"]))
 
     # Handle duplicate hostnames on the same interface
     adjusted_matches = set()
@@ -139,7 +143,7 @@ def run():
             logging.error("Error retrieving NDP table")
             time.sleep(CLOCK)
             continue
-        leases = get_dhcp4_leases()
+        leases = get_dhcp4_leases_v2()
         if leases is None:
             logging.error("Error retrieving DHCPv4 leases")
             time.sleep(CLOCK)
