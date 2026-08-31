@@ -116,7 +116,7 @@ def add_record(zone, domain, record_type, ip):
 
 def add_ptr_record(ip, ptr_target, rev_zone):
     rev_name = ipaddress.ip_address(ip).reverse_pointer
-    url = f"{TECHNITIUM_URL}/api/zones/records/add?token={TECHNITIUM_TOKEN}&domain={rev_name}&type=PTR&ttl=5&expiryTtl=604800&overwrite=false&ptr={ptr_target}&ipAddress={ip}&zone={rev_zone}"
+    url = f"{TECHNITIUM_URL}/api/zones/records/add?token={TECHNITIUM_TOKEN}&domain={rev_name}&type=PTR&ttl=5&expiryTtl=604800&overwrite=false&ptrName={ptr_target}&zone={rev_zone}"
     r = requests.get(url=url, verify=VERIFY_HTTPS)
     if r.status_code != 200:
         logging.error("Error adding PTR record: " + str(r.status_code) + ": " + r.text)
