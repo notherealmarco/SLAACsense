@@ -21,6 +21,8 @@ Define the environment variables in the docker-compose file, then run: `docker c
 | `TECHNITIUM_TOKEN`    | Technitium DNS token                                                                     | `another_very_secret_token` (required)                                 |
 | `DNS_ZONE_SUBNETS`    | Comma separated DNS zones and IPv4 subnet                                                | `192.168.1.0/24=lan.home.arpa,192.168.2.0/24=dmz.home.arpa` (required) |
 | `DO_V4`               | If set to true, A records will be configured, otherwise only AAAA records are configured | `false` (defaults to false)                                            |
+| `PTR_ONLY`            | If set to true, only PTR records will be created/updated, no A/AAAA records              | `false` (defaults to false)                                            |
+| `REVERSE_ZONES`       | Comma separated subnet prefixes for which to create PTR records (both IPv4 and IPv6)     | `2001:db8:abcd::/48,192.168.10.0/24` (required when `PTR_ONLY=true`)   |
 | `IGNORE_LINK_LOCAL`   | If set to true, link local IPv6 addresses wil be ignored                                 | `true` (defaults to true)                                              |
 | `VERIFY_HTTPS`        | Verify OPNsense and Technitium's SSL certificates                                        | `true` (defaults to true)                                              |
 | `CLOCK`               | Interval between updates (in seconds)                                                    | `30` (defaults to 30)                                                  |
@@ -28,7 +30,8 @@ Define the environment variables in the docker-compose file, then run: `docker c
 
 ### Note
 You have to create the corresponding DNS zones in the Technitium dashboard, you can configure them as primary or conditional forwarder zones.
-If DNS records are not being added, make sure that the corresponding reverse zone exists in Technitium DNS, otherwise the script will fail silently.
+If DNS records are not being added, make sure that the corresponding forward and reverse zones exist in Technitium DNS, otherwise the script will fail silently.
+For each prefix listed in `REVERSE_ZONES`, the corresponding reverse zone (e.g. `d.c.b.a.8.b.d.0.1.0.0.2.ip6.arpa` for `2001:db8:abcd::/48`) must exist in Technitium; the prefix's length must match the reverse zone boundary you configured.
 
 ### Contributing:
 I welcome contributions! Feel free to submit issues, feature requests, or pull requests.

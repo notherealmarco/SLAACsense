@@ -13,6 +13,7 @@ OPNSENSE_API_SECRET = os.getenv("OPNSENSE_API_SECRET", None)
 TECHNITIUM_URL = os.getenv("TECHNITIUM_URL", None)
 TECHNITIUM_TOKEN = os.getenv("TECHNITIUM_TOKEN", None)
 DNS_ZONE_SUBNETS = os.getenv("DNS_ZONE_SUBNETS", None)
+REVERSE_ZONES = os.getenv("REVERSE_ZONES", None)
 DO_V4 = (os.getenv("DO_V4", "false").lower() == "true")
 PTR_ONLY = (os.getenv("PTR_ONLY", "false").lower() == "true")
 IGNORE_LINK_LOCAL = (os.getenv("IGNORE_LINK_LOCAL", "true").lower() == "true")
@@ -74,6 +75,21 @@ def find_zone(zones, ip4):
         if ip4 in zone[0]: return zone[1]
     return None
 
+def reverse_zone_name(net):
+    if net.version == 4:
+        n = -(-net.prefixlen // 8)
+        octets = net.network_address.packed
+        return ".".join(str(b) for b in reversed(octets[:n])) + ".in-addr.arpa"
+    else:
+        hexstr = format(int(net.network_address), "032x")
+        n = net.prefixlen // 4
+        return ".".join(reversed(hexstr[:n])) + ".ip6.arpa"
+
+def find_reverse_zone(reverse_zones, ip):
+    for net, zone_name in reverse_zones:
+        if ip in net: return zone_name
+    return None
+
 def get_existing_records(domain, zone):
     url = f"{TECHNITIUM_URL}/api/zones/records/get?token={TECHNITIUM_TOKEN}&domain={domain}.{zone}"
     r = requests.get(url=url, verify=VERIFY_HTTPS)
@@ -98,16 +114,16 @@ def add_record(zone, domain, record_type, ip):
     else:
         logging.info(f"Added {record_type} record for {ip} in {domain}.{zone}")
 
-def add_ptr_record(ip, ptr_target):
+def add_ptr_record(ip, ptr_target, rev_zone):
     rev_name = ipaddress.ip_address(ip).reverse_pointer
-    url = f"{TECHNITIUM_URL}/api/zones/records/add?token={TECHNITIUM_TOKEN}&domain={rev_name}&type=PTR&ttl=5&expiryTtl=604800&overwrite=false&ptr={ptr_target}&ipAddress={ip}"
+    url = f"{TECHNITIUM_URL}/api/zones/records/add?token={TECHNITIUM_TOKEN}&domain={rev_name}&type=PTR&ttl=5&expiryTtl=604800&overwrite=false&ptr={ptr_target}&ipAddress={ip}&zone={rev_zone}"
     r = requests.get(url=url, verify=VERIFY_HTTPS)
     if r.status_code != 200:
         logging.error("Error adding PTR record: " + str(r.status_code) + ": " + r.text)
     else:
         logging.info(f"Added PTR record for {ip} -> {ptr_target}")
 
-def sync_records(zones, match):
+def sync_records(zones, reverse_zones, match):
     ip4 = match[0]
     ip6s = [ipaddress.ip_address(x).compressed for x in match[1]]
     hostname = match[2]
@@ -122,11 +138,13 @@ def sync_records(zones, match):
             logging.warning("Could not find a DNS zone for " + ip4)
             return
         ptr_target = f"{hostname}.{zone}"
-        ptr_ips = set(ip6s)
+        ptr_ips = set(ip for ip in ip6s if find_reverse_zone(reverse_zones, ipaddress.ip_address(ip)) is not None)
         if DO_V4:
-            ptr_ips.add(ip4)
+            if find_reverse_zone(reverse_zones, ipaddress.ip_address(ip4)) is not None:
+                ptr_ips.add(ip4)
         for ip in ptr_ips:
-            add_ptr_record(ip, ptr_target)
+            rev_zone = find_reverse_zone(reverse_zones, ipaddress.ip_address(ip))
+            add_ptr_record(ip, ptr_target, rev_zone)
         return
 
     zone = find_zone(zones, ipaddress.ip_address(ip4))
@@ -158,6 +176,12 @@ def run():
         zone = z.split("=")
         zones.append((ipaddress.ip_network(zone[0]), zone[1]))
 
+    reverse_zones = []
+    if REVERSE_ZONES:
+        for p in REVERSE_ZONES.split(","):
+            net = ipaddress.ip_network(p.strip())
+            reverse_zones.append((net, reverse_zone_name(net)))
+
     refresh_counter = 0
     
     while True:
@@ -176,14 +200,14 @@ def run():
         # Process new matches (hosts that appeared or changed)
         new_matches = matches - previous_matches
         for match in new_matches:
-            sync_records(zones, match)
+            sync_records(zones, reverse_zones, match)
             
         # Every REFRESH_CYCLE iterations, refresh all records to prevent expiration
         refresh_counter += 1
         if refresh_counter >= REFRESH_CYCLE:
             logging.info(f"Performing periodic refresh of all DNS records")
             for match in matches:
-                sync_records(zones, match)
+                sync_records(zones, reverse_zones, match)
             refresh_counter = 0
         
         previous_matches = matches
@@ -196,6 +220,7 @@ def verify_env() -> bool:
     if not TECHNITIUM_URL: return False
     if not TECHNITIUM_TOKEN: return False
     if not DNS_ZONE_SUBNETS: return False
+    if PTR_ONLY and not REVERSE_ZONES: return False
     return True
 
 if __name__ == "__main__":
