@@ -14,6 +14,7 @@ TECHNITIUM_URL = os.getenv("TECHNITIUM_URL", None)
 TECHNITIUM_TOKEN = os.getenv("TECHNITIUM_TOKEN", None)
 DNS_ZONE_SUBNETS = os.getenv("DNS_ZONE_SUBNETS", None)
 DO_V4 = (os.getenv("DO_V4", "false").lower() == "true")
+PTR_ONLY = (os.getenv("PTR_ONLY", "false").lower() == "true")
 IGNORE_LINK_LOCAL = (os.getenv("IGNORE_LINK_LOCAL", "true").lower() == "true")
 VERIFY_HTTPS = (os.getenv("VERIFY_HTTPS", "true").lower() == "true")
 CLOCK = int(os.getenv("CLOCK", "30"))
@@ -97,18 +98,35 @@ def add_record(zone, domain, record_type, ip):
     else:
         logging.info(f"Added {record_type} record for {ip} in {domain}.{zone}")
 
-def sync_records(zones, match):
-    zone = find_zone(zones, ipaddress.ip_address(match[0]))
-    if zone is None:
-        logging.warning("Could not find a DNS zone for " + match[0])
-        return
+def add_ptr_record(ip, hostname):
+    rev_name = ipaddress.ip_address(ip).reverse_pointer
+    url = f"{TECHNITIUM_URL}/api/zones/records/add?token={TECHNITIUM_TOKEN}&domain={rev_name}&type=PTR&ttl=5&expiryTtl=604800&overwrite=false&ptr={hostname}&ipAddress={ip}"
+    r = requests.get(url=url, verify=VERIFY_HTTPS)
+    if r.status_code != 200:
+        logging.error("Error adding PTR record: " + str(r.status_code) + ": " + r.text)
+    else:
+        logging.info(f"Added PTR record for {ip} -> {hostname}")
 
+def sync_records(zones, match):
     ip4 = match[0]
     ip6s = [ipaddress.ip_address(x).compressed for x in match[1]]
     hostname = match[2]
 
     if hostname == "":
         logging.warning("No hostname found for " + match[0])
+        return
+
+    if PTR_ONLY:
+        ptr_ips = set(ip6s)
+        if DO_V4:
+            ptr_ips.add(ip4)
+        for ip in ptr_ips:
+            add_ptr_record(ip, hostname)
+        return
+
+    zone = find_zone(zones, ipaddress.ip_address(ip4))
+    if zone is None:
+        logging.warning("Could not find a DNS zone for " + ip4)
         return
 
     existing_records = get_existing_records(hostname, zone)
