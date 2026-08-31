@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from datetime import datetime, timedelta, timezone
 import requests
 import ipaddress
 import urllib3
@@ -21,6 +22,9 @@ VERIFY_HTTPS = (os.getenv("VERIFY_HTTPS", "true").lower() == "true")
 CLOCK = int(os.getenv("CLOCK", "30"))
 # How often to refresh all records (in cycles)
 REFRESH_CYCLE = int(os.getenv("REFRESH_CYCLE", "1440"))
+# Re-add a record when it is within this much of its expiry, so it is refreshed
+# before it lapses even if one full refresh cycle is missed.
+REFRESH_THRESHOLD = CLOCK * REFRESH_CYCLE + 60
 
 def get_opnsense_data(path):
     r = requests.get(url=OPNSENSE_URL + path, verify=VERIFY_HTTPS, auth=(OPNSENSE_API_KEY, OPNSENSE_API_SECRET))
@@ -91,12 +95,23 @@ def find_reverse_zone(reverse_zones, ip):
     return None
 
 def get_existing_records(domain, zone):
-    url = f"{TECHNITIUM_URL}/api/zones/records/get?token={TECHNITIUM_TOKEN}&domain={domain}.{zone}"
+    url = f"{TECHNITIUM_URL}/api/zones/records/get?token={TECHNITIUM_TOKEN}&domain={domain}&zone={zone}"
     r = requests.get(url=url, verify=VERIFY_HTTPS)
     if r.status_code != 200:
         logging.error("Error fetching existing records: " + str(r.status_code) + ": " + r.text)
         return []
     return r.json().get("response", {}).get("records", [])
+
+def record_needs_refresh(record) -> bool:
+    expiry_ttl = record.get("expiryTtl") or 0
+    if expiry_ttl <= 0:
+        return False
+    last_modified = record.get("lastModified")
+    if not last_modified:
+        return False
+    last_modified = datetime.fromisoformat(last_modified.replace("Z", "+00:00"))
+    expires_at = last_modified + timedelta(seconds=expiry_ttl)
+    return (expires_at - datetime.now(timezone.utc)) <= timedelta(seconds=REFRESH_THRESHOLD)
 
 def delete_record(zone, domain, record_type, value):
     url = f"{TECHNITIUM_URL}/api/zones/records/delete?token={TECHNITIUM_TOKEN}&domain={domain}.{zone}&zone={zone}&type={record_type}&value={value}"
@@ -144,6 +159,12 @@ def sync_records(zones, reverse_zones, match):
                 ptr_ips.add(ip4)
         for ip in ptr_ips:
             rev_zone = find_reverse_zone(reverse_zones, ipaddress.ip_address(ip))
+            rev_name = ipaddress.ip_address(ip).reverse_pointer
+            existing_records = get_existing_records(rev_name, rev_zone)
+            ptr_records = [r for r in existing_records if r["type"] == "PTR"]
+            matching = [r for r in ptr_records if r.get("rData", {}).get("ptrName") == ptr_target]
+            if matching and not any(record_needs_refresh(r) for r in matching):
+                continue
             add_ptr_record(ip, ptr_target, rev_zone)
         return
 
@@ -152,19 +173,26 @@ def sync_records(zones, reverse_zones, match):
         logging.warning("Could not find a DNS zone for " + ip4)
         return
 
-    existing_records = get_existing_records(hostname, zone)
-    existing_ips = {ipaddress.ip_address(r["rData"]["ipAddress"]).compressed for r in existing_records if r["type"] in ["A", "AAAA"]}
+    existing_records = get_existing_records(f"{hostname}.{zone}", zone)
+    existing = {}
+    for r in existing_records:
+        if r["type"] in ["A", "AAAA"]:
+            try:
+                existing[ipaddress.ip_address(r["rData"]["ipAddress"]).compressed] = r
+            except (KeyError, ValueError):
+                continue
     current_ips = set([ipaddress.ip_address(ip4).compressed] if DO_V4 else []) | set(ip6s)
 
     # Delete outdated records
-    for ip in existing_ips - current_ips:
+    for ip in set(existing.keys()) - current_ips:
         record_type = "A" if "." in ip else "AAAA"
         delete_record(zone, hostname, record_type, ip)
 
-    # Add missing records
-    for ip in current_ips - existing_ips:
+    # Add missing or expiring records
+    for ip in current_ips:
         record_type = "A" if "." in ip else "AAAA"
-        add_record(zone, hostname, record_type, ip)
+        if ip not in existing or record_needs_refresh(existing[ip]):
+            add_record(zone, hostname, record_type, ip)
 
 def run():
     if not VERIFY_HTTPS:

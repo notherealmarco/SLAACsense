@@ -33,6 +33,8 @@ You have to create the corresponding DNS zones in the Technitium dashboard, you 
 If DNS records are not being added, make sure that the corresponding forward and reverse zones exist in Technitium DNS, otherwise the script will fail silently.
 For each prefix listed in `REVERSE_ZONES`, the corresponding reverse zone (e.g. `d.c.b.a.8.b.d.0.1.0.0.2.ip6.arpa` for `2001:db8:abcd::/48`) must exist in Technitium; the prefix's length must match the reverse zone boundary you configured.
 
+Records are created with an expiration TTL and re-added only when needed (missing, changed, or within `CLOCK * REFRESH_CYCLE + 60` seconds of expiring), so no redundant write is made while keeping records alive. Stale PTR records are intentionally left in place for historical reference.
+
 ### Contributing:
 I welcome contributions! Feel free to submit issues, feature requests, or pull requests.
 
