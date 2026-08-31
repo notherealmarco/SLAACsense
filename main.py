@@ -98,14 +98,14 @@ def add_record(zone, domain, record_type, ip):
     else:
         logging.info(f"Added {record_type} record for {ip} in {domain}.{zone}")
 
-def add_ptr_record(ip, hostname):
+def add_ptr_record(ip, ptr_target):
     rev_name = ipaddress.ip_address(ip).reverse_pointer
-    url = f"{TECHNITIUM_URL}/api/zones/records/add?token={TECHNITIUM_TOKEN}&domain={rev_name}&type=PTR&ttl=5&expiryTtl=604800&overwrite=false&ptr={hostname}&ipAddress={ip}"
+    url = f"{TECHNITIUM_URL}/api/zones/records/add?token={TECHNITIUM_TOKEN}&domain={rev_name}&type=PTR&ttl=5&expiryTtl=604800&overwrite=false&ptr={ptr_target}&ipAddress={ip}"
     r = requests.get(url=url, verify=VERIFY_HTTPS)
     if r.status_code != 200:
         logging.error("Error adding PTR record: " + str(r.status_code) + ": " + r.text)
     else:
-        logging.info(f"Added PTR record for {ip} -> {hostname}")
+        logging.info(f"Added PTR record for {ip} -> {ptr_target}")
 
 def sync_records(zones, match):
     ip4 = match[0]
@@ -117,11 +117,16 @@ def sync_records(zones, match):
         return
 
     if PTR_ONLY:
+        zone = find_zone(zones, ipaddress.ip_address(ip4))
+        if zone is None:
+            logging.warning("Could not find a DNS zone for " + ip4)
+            return
+        ptr_target = f"{hostname}.{zone}"
         ptr_ips = set(ip6s)
         if DO_V4:
             ptr_ips.add(ip4)
         for ip in ptr_ips:
-            add_ptr_record(ip, hostname)
+            add_ptr_record(ip, ptr_target)
         return
 
     zone = find_zone(zones, ipaddress.ip_address(ip4))
